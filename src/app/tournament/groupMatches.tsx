@@ -1,5 +1,4 @@
 import { Dispatch, FC, SetStateAction, useCallback, useEffect, useMemo, useState } from "react";
-import bergerTable from "berger-table-generator";
 
 interface Match {
   team1: string;
@@ -52,12 +51,16 @@ const GroupMatches: FC<GroupMatchesProps> = ({ matches, setView }) => {
     }
 
     setAllRounds(rounds)
+
+    if (rounds[rounds.length - 1].length < 4) {
+      sortMatches()
+    }
+
   }, [])
 
-  const sortedMatches = useMemo(() => {
-    return sortMatches();
-  }, []);
-  
+  useEffect(() => {
+    sortMatches();
+  }, [])
   
   return (
     <div>
