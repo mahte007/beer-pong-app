@@ -1,56 +1,48 @@
 "use client";
 
-import { MouseEvent, useEffect, useState } from "react";
+import { MouseEvent, useCallback, useEffect, useMemo, useState } from "react";
 import MOCK_GROUPS from "./MOCK_DATA";
 import Groups from "./groups";
 import GroupMatches from "./groupMatches";
-
-interface Team {
-  name: string;
-  wins: number;
-  losses: number;
-  draws: number;
-  thrown: number;
-  received: number;
-  points: number;
-}
-
-interface Match {
-  team1: string;
-  team2: string;
-}
+import { child, get, getDatabase, ref, set } from "firebase/database";
+import { database } from "../../firebase/firebaseConfig";
+import { useSearchParams } from "next/navigation";
+import { Views } from "../../enums/views";
+import AddTeams from "./addTeams";
+import { Match, Team, Tournament } from "../../interfaces/tournaments";
 
 const BeerPongTournament = () => {
-  const [tournamentName, setTournamentName] = useState("");
+  const searchParams = useSearchParams();
+  const tournamentId = searchParams.get("id");
+
+  const [tournament, setTournament] = useState<Tournament>();
+
   const [teams, setTeams] = useState<Team[]>([]);
-  const [newTeam, setNewTeam] = useState<Team>({
-    name: "",
-    wins: 0,
-    losses: 0,
-    draws: 0,
-    thrown: 0,
-    received: 0,
-    points: 0,
-  });
+  
   const [tournamentStarted, setTournamentStarted] = useState(false);
   const [groups, setGroups] = useState<Team[][]>([]);
   const [matches, setMatches] = useState<Match[][]>([]);
-  const [view, setView] = useState("");
+  const [view, setView] = useState(Views.ADD_TEAMS);
 
-  const addTeam = () => {
-    if (newTeam.name.trim() !== "") {
-      setTeams([...teams, newTeam]);
-      setNewTeam({
-        name: "",
-        wins: 0,
-        losses: 0,
-        draws: 0,
-        thrown: 0,
-        received: 0,
-        points: 0,
-      });
-    }
-  };
+  console.log(view)
+
+  const dbRef = ref(getDatabase());
+    useEffect(() => {
+      get(child(dbRef, `tournaments/${tournamentId}/`))
+        .then((snapshot) => {
+          if (snapshot.exists()) {
+
+            const data = snapshot.val()
+
+            setTournament(data);
+          } else {
+            console.log("No data available");
+          }
+        })
+        .catch((error) => {
+          console.error(error);
+        });
+    }, []);  
 
   const generateGroups = () => {
     let shuffledTeams = [...teams].sort(() => Math.random() - 0.5);
@@ -74,6 +66,20 @@ const BeerPongTournament = () => {
 
     setGroups(groupedTeams);
     generateMatches(groupedTeams);
+
+    groupedTeams.map((group, index) => {
+      group.map((team, teamIndex) => {
+        set(ref(database, `tournaments/${tournament?.id}/groups/group-${index + 1}/team-${teamIndex + 1}`), {
+          name: team.name,
+          wins: team.wins,
+          losses: team.losses,
+          draws: team.draws,
+          thrown: team.thrown,
+          recieved: team.received,
+        })
+      })
+    })
+
   };
 
   const generateMatches = (allGroups: Team[][]) => {
@@ -86,7 +92,7 @@ const BeerPongTournament = () => {
           groupMatches.push({ team1: group[i].name, team2: group[j].name });
         }
       }
-      allMatches.push(groupMatches)
+      allMatches.push(groupMatches);
       groupMatches = [];
     });
     setMatches(allMatches);
@@ -96,71 +102,85 @@ const BeerPongTournament = () => {
     if (teams.length > 1) {
       generateGroups();
       setTournamentStarted(true);
+
+      teams.map((team) => {
+        set(ref(database, `tournaments/${tournament?.id}/teams/` + team.name), {
+          name: team.name,
+          wins: team.wins,
+          losses: team.losses,
+          draws: team.draws,
+          thrown: team.thrown,
+          recieved: team.received,
+        });
+      })
+
+      setView(Views.GROUPS)
     }
   };
 
-  useEffect(() => {
-    setTeams(MOCK_GROUPS);
-  }, []);
+  const changeView = useCallback((e: any) => {
+    setView(e.target.value);
+  }, [view])
 
-  return (
+  useEffect(() => {
+    tournament?.isStarted && setView(Views.GROUPS)
+  }, [tournament])
+
+  const viewPage = useMemo(() => {
+    switch (view) {
+      case Views.GROUP_MATCHES:
+        return <GroupMatches matches={matches} setView={setView} />;
+      case Views.GROUPS:
+        return tournament?.groups && (
+          <Groups
+            groups={Object.values(tournament.groups)}
+            teams={Object.values(tournament?.teams)}
+            tournamentName={tournament?.name ?? ""}
+            setView={setView}
+          />
+        );
+      case Views.ADD_TEAMS:
+        return (
+          <AddTeams
+            startTournament={startTournament}
+            teams={teams}
+            setTeams={setTeams}
+          />
+        );
+      default:
+        break;
+    }
+  }, [view, tournament, teams]);
+
+  return tournament && (
     <div className="p-4 max-w-lg mx-auto">
       <h1 className="text-xl font-bold mb-4">Beer Pong Tournament</h1>
-      {!tournamentStarted ? (
-        <div>
-          <input
-            type="text"
-            placeholder="Tournament Name"
-            value={tournamentName}
-            onChange={(e) => setTournamentName(e.target.value)}
-            className="border p-2 w-full mb-2"
-          />
-          <div className="mb-2">
-            <input
-              type="text"
-              placeholder="Team Name"
-              value={newTeam.name}
-              onChange={(e) =>
-                setNewTeam({
-                  ...newTeam,
-                  name: e.target.value,
-                })
-              }
-              className="border p-2 w-full"
-            />
-            <button
-              onClick={addTeam}
-              className="bg-blue-500 text-white p-2 mt-2 w-full"
-            >
-              Add Team
-            </button>
-          </div>
-          <ul className="list-disc pl-4">
-            {teams.map((team, index) => (
-              <li key={index}>
-                {team.name} (Wins: {team.wins}, Losses: {team.losses}, Draws:{" "}
-                {team.draws}, Thrown: {team.thrown}, Received: {team.received},
-                Points: {team.points})
-              </li>
-            ))}
-          </ul>
-          <button
-            onClick={startTournament}
-            className="bg-green-500 text-white p-2 mt-4 w-full"
-          >
-            Start Tournament
-          </button>
-        </div>
-      ) : view === "groupMatches" ? (
-        <GroupMatches matches={matches} setView={setView} />
-      ) : (
-        <Groups
-          groups={groups}
-          teams={teams}
-          tournamentName={tournamentName}
-          setView={setView}
-        />
-      )}
+      <h2 className="text-lg font-bold mb-4">{tournament.name}</h2>
+      <div className="flex">
+        <button
+          value={Views.ADD_TEAMS}
+          onClick={changeView}
+          className="p-2 mt-4 w-full border-black border"
+          disabled={tournamentStarted || tournament.isStarted}
+        >
+          Start Tournament
+        </button>
+        <button
+          value={Views.GROUPS}
+          onClick={changeView}
+          className="p-2 mt-4 w-full border-black border"
+        >
+          Groups
+        </button>
+        <button
+          value={Views.GROUP_MATCHES}
+          onClick={changeView}
+          className="p-2 mt-4 w-full border-black border"
+        >
+          Matches
+        </button>
+      </div>
+      {viewPage}
     </div>
   );
 };

@@ -1,20 +1,12 @@
 import { Dispatch, FC, SetStateAction } from "react";
-
-interface Team {
-  name: string;
-  wins: number;
-  losses: number;
-  draws: number;
-  thrown: number;
-  received: number;
-  points: number;
-}
+import { Views } from "../../enums/views";
+import { Team } from "../../interfaces/tournaments";
 
 interface GroupsProps {
   tournamentName: string;
   teams: Team[];
   groups: Team[][];
-  setView: Dispatch<SetStateAction<string>>;
+  setView: Dispatch<SetStateAction<Views>>;
 }
 
 const Groups: FC<GroupsProps> = ({
@@ -27,7 +19,13 @@ const Groups: FC<GroupsProps> = ({
     setView(e.target.value);
   };
 
-  return (
+  const calculatePoints = (wins: number, draws: number) => {
+    return wins * 3 + draws;
+  }
+  
+  console.log(groups)
+
+  return groups && (
     <>
       <div>
         <h2 className="text-lg font-bold">
@@ -39,11 +37,11 @@ const Groups: FC<GroupsProps> = ({
           <div key={index} className="mt-2 p-2 border">
             <h4 className="font-semibold">Group {index + 1}</h4>
             <ul className="list-disc pl-4">
-              {group.map((team, i) => (
+              {Object.values(group).map((team, i) => (
                 <li key={i}>
                   {team.name} (Wins: {team.wins}, Losses: {team.losses}, Draws:{" "}
                   {team.draws}, Thrown: {team.thrown}, Received: {team.received}
-                  , Points: {team.points})
+                  , Points: {calculatePoints(team.wins, team.draws)})
                 </li>
               ))}
             </ul>

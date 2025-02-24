@@ -1,13 +1,10 @@
 import { Dispatch, FC, SetStateAction, useCallback, useEffect, useMemo, useState } from "react";
-
-interface Match {
-  team1: string;
-  team2: string;
-}
+import { Views } from "../../enums/views";
+import { Match } from "../../interfaces/tournaments";
 
 interface GroupMatchesProps {
   matches: Match[][];
-  setView: Dispatch<SetStateAction<string>>;
+  setView: Dispatch<SetStateAction<Views>>;
 }
 
 const GroupMatches: FC<GroupMatchesProps> = ({ matches, setView }) => {
@@ -18,7 +15,7 @@ const GroupMatches: FC<GroupMatchesProps> = ({ matches, setView }) => {
   };
 
   const sortMatches = useCallback(() => {
-    const availableTables = 8;
+    const availableTables = 2;
     let flatMatches: Match[] = matches.flat();
     let rounds: Match[][] = [];
   
@@ -52,7 +49,7 @@ const GroupMatches: FC<GroupMatchesProps> = ({ matches, setView }) => {
 
     setAllRounds(rounds)
 
-    if (rounds[rounds.length - 1].length < 4) {
+    if (matches.flat().length > 8 && rounds[rounds.length - 1].length < 1) {
       sortMatches()
     }
 
